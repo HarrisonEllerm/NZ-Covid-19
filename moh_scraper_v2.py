@@ -4,6 +4,8 @@ from bs4 import BeautifulSoup
 import platform
 import requests
 import pandas as pd
+import time
+import json
 from geopy.geocoders import Nominatim
 
 # Script used to import Ministry of Health Data into Power BI
@@ -18,10 +20,8 @@ base_data_url = 'https://www.health.govt.nz'
 # Current cases url where link exists
 current_cases_url = 'https://www.health.govt.nz/our-work/diseases-and-conditions/covid-19-novel-coronavirus/covid-19' \
                     '-current-situation/covid-19-current-cases/covid-19-current-cases-details'
-# List of geo data for locations
-geo_dict_list = []
 # Geo locator object used for finding lat & long co-ordinates
-geo_locator = Nominatim(user_agent='mohscraper', timeout=5)
+geo_locator = Nominatim(user_agent='moh_scraper', timeout=10)
 
 
 # Sets up folder to store data within. If it doesn't already exist
@@ -71,37 +71,33 @@ def setup_data_source_path():
         exit(1)
 
 
-# Returns the geo-location associated with a DHB
-# If it is already within the list of DHBs it pulls it from the list
-# Otherwise it uses gepoy to find it, and updates the list
+# Returns the geo-location associated with a location
 # Parameter: Name of location i.e. "Wellington"
 # Returns: A dictionary of geo location data associated with the location
 # i.e. {'location': 'Wellington', 'lat': -41.2887953, 'long': 174.7772114}
 def get_geo_loc(location_name, nz):
-    # Custom mapping rules - due to geolocater noo being able to pick up some DHBs
+    # Custom mapping rules - due to geolocater noo being able to pick up some DHB's and locations
     if location_name == 'Capital and Coast':
         location_name = 'Wellington'
     elif location_name == 'MidCentral':
         location_name = 'Palmerston North'
+    elif location_name == 'Polynesia (excludes Hawaii) nfd':
+        location_name = 'Polynesia'
     # If undefined just assign New Zealand as geo-location
     elif location_name == 'TBC':
         location_name = 'New Zealand'
 
-    # If the list has items and data for the location we are looking for already exists, return it
-    if len(geo_dict_list) > 0 and len([loc for loc in geo_dict_list if loc['location'] == location_name]) > 0:
-        return [loc for loc in geo_dict_list if loc['location'] == location_name][0]
-    # Otherwise query for it, store it in the dictionary and then return data
+    if nz:
+        data = geo_locator.geocode(f'{location_name}, NZ')
     else:
-        if nz:
-            data = geo_locator.geocode(f'{location_name}, NZ')
-        else:
-            data = geo_locator.geocode(f'{location_name}')
+        data = geo_locator.geocode(f'{location_name}')
 
-        geo_dict = {'location': location_name,
-                    'lat': data.latitude,
-                    'long': data.longitude}
-        geo_dict_list.append(geo_dict)
-        return geo_dict
+    if data is None:
+        print(f'>> Could not find geo location for "{location_name}", add to custom mapping rules')
+        print(f'>> exiting...')
+        exit(1)
+
+    return {'location': location_name, 'lat': data.latitude, 'long': data.longitude}
 
 
 # Downloads a file using requests and writes it
@@ -116,29 +112,56 @@ def download_file(from_url, to_folder):
     return file_loc
 
 
+# Sets up the location fields within the output data frame
+# Queries a json file that holds geo-location data for previously
+# queried locations in order to reduce load on Nominatim API
 def setup_location_fields(df):
-    lat_list = []
-    long_list = []
-    arrived_from_lat_list = []
-    arrived_from_long_list = []
-    # Setup DHB location data
-    for index, row in df.iterrows():
-        dhb_location_data = get_geo_loc(row['DHB'], nz=True)
-        lat_list.append(dhb_location_data.get('lat'))
-        long_list.append(dhb_location_data.get('long'))
+    with open('loc_data.json', 'r') as json_file:
+        existing_geo_locs = json.load(json_file)
+        lat_list = []
+        long_list = []
+        arrived_from_lat_list = []
+        arrived_from_long_list = []
 
-        if row['Last country before return'] is None:
-            arrived_from_lat_list.append(None)
-            arrived_from_long_list.append(None)
-        else:
-            arrived_from_location_data = get_geo_loc(row['Last country before return'], nz=False)
-            arrived_from_lat_list.append(arrived_from_location_data.get('lat'))
-            arrived_from_long_list.append(arrived_from_location_data.get('long'))
+        # Setup DHB location data
+        for index, row in df.iterrows():
+            # Already seen this DHB before
+            if row['DHB'] in existing_geo_locs:
+                lat_list.append(existing_geo_locs[row['DHB']]['lat'])
+                long_list.append(existing_geo_locs[row['DHB']]['long'])
+            else:
+                dhb_location_data = get_geo_loc(row['DHB'], nz=True)
+                lat_list.append(dhb_location_data.get('lat'))
+                long_list.append(dhb_location_data.get('long'))
+                existing_geo_locs[row['DHB']] = {
+                    'lat': dhb_location_data.get('lat'),
+                    'long': dhb_location_data.get('long')
+                }
 
-    df = df.assign(DHB_Latitude=lat_list, DHB_Longitude=long_list,
-                   Arrived_From_Latitude=arrived_from_lat_list,
-                   Arrived_from_Longitude=arrived_from_long_list)
-    return df
+            # Setup previous country travelled to data
+            if row['Last country before return'] == '':
+                arrived_from_lat_list.append(None)
+                arrived_from_long_list.append(None)
+            else:
+                # Already seen this country before
+                if row['Last country before return'] in existing_geo_locs:
+                    arrived_from_lat_list.append(existing_geo_locs[row['Last country before return']]['lat'])
+                    arrived_from_long_list.append(existing_geo_locs[row['Last country before return']]['long'])
+                else:
+                    arrived_from_location_data = get_geo_loc(row['Last country before return'], nz=False)
+                    arrived_from_lat_list.append(arrived_from_location_data.get('lat'))
+                    arrived_from_long_list.append(arrived_from_location_data.get('long'))
+                    existing_geo_locs[row['Last country before return']] = {
+                        'lat': arrived_from_location_data.get('lat'),
+                        'long': arrived_from_location_data.get('long')
+                    }
+
+        with open('loc_data.json', mode='w') as out_file:
+            json.dump(existing_geo_locs, out_file)
+
+        return df.assign(DHB_Latitude=lat_list, DHB_Longitude=long_list,
+                         Arrived_From_Latitude=arrived_from_lat_list,
+                         Arrived_from_Longitude=arrived_from_long_list)
 
 
 if __name__ == '__main__':
@@ -146,21 +169,35 @@ if __name__ == '__main__':
     data_store_path = setup_environ()
     data_source_path = setup_data_source_path()
     path_to_downloaded_file = download_file(from_url=data_source_path, to_folder=data_store_path)
-
     pd.options.display.width = 0
 
+    print(">> Building out confirmed cases...")
     # Read in current cases
     current_cases_raw_df = pd.read_excel(path_to_downloaded_file, sheet_name='Confirmed', engine='openpyxl')
     current_cases_df = pd.DataFrame(current_cases_raw_df.values[3:], columns=current_cases_raw_df.iloc[2])
-    # Setup location data
-    current_cases_df = setup_location_fields(current_cases_df)
     # Clean up some rubbish columns
     current_cases_df = current_cases_df.dropna(axis=1, how='all')
+    # Makes it easier to test if they travelled to a country prior to contracting
+    current_cases_df = current_cases_df.fillna('')
+    # Setup location data
+    current_cases_df = setup_location_fields(current_cases_df)
 
+    print(">> Building out probable cases...")
     # Read in probable cases
     probable_cases_raw_df = pd.read_excel(path_to_downloaded_file, sheet_name='Probable', engine='openpyxl')
     probable_cases_df = pd.DataFrame(probable_cases_raw_df.values[3:], columns=probable_cases_raw_df.iloc[2])
-    # Setup location data
-    probable_cases_df = setup_location_fields(probable_cases_df)
-    # Clean up
     probable_cases_df = probable_cases_df.dropna(axis=1, how='all')
+    probable_cases_df = probable_cases_df.fillna('')
+    probable_cases_df = setup_location_fields(probable_cases_df)
+
+    # Get rid of raw data frames to avoid accidental import into Power-BI
+    del current_cases_raw_df
+    del probable_cases_raw_df
+
+    # Export for COP
+    print('>> Exporting for COP')
+    with pd.ExcelWriter(
+            f'{data_store_path}\\COP_Data\\Covid_19_Data_For_Cop_{time.strftime("%Y%m%d")}.xlsx') as writer:
+        current_cases_df.to_excel(excel_writer=writer, sheet_name='Confirmed Cases', index=False)
+        probable_cases_df.to_excel(excel_writer=writer, sheet_name='Probable Cases', index=False)
+    print('>>> Ended')
