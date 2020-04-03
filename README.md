@@ -9,4 +9,4 @@ intended to be used as an official source of information relate to COVID-19.
 
 Initial Dashboard Mock Up
 
-![Screenshot](Dashboard_Ex.png)
+![Dashboard Example](https://github.com/HarrisonEllerm/NZ-Covid-19/blob/master/Dashboard_Ex.PNG?raw=True)
