@@ -20,6 +20,9 @@ base_data_url = 'https://www.health.govt.nz'
 # Current cases url where link exists
 current_cases_url = 'https://www.health.govt.nz/our-work/diseases-and-conditions/covid-19-novel-coronavirus/covid-19' \
                     '-current-situation/covid-19-current-cases/covid-19-current-cases-details'
+# Location data file
+loc_file_path = os.path.join(os.path.join(os.environ['USERPROFILE']), 'Documents', 'MOH_Data', 'Geo_Data',
+                             'loc_data.json')
 # Geo locator object used for finding lat & long co-ordinates
 geo_locator = Nominatim(user_agent='moh_scraper', timeout=10)
 
@@ -116,7 +119,7 @@ def download_file(from_url, to_folder):
 # Queries a json file that holds geo-location data for previously
 # queried locations in order to reduce load on Nominatim API
 def setup_location_fields(df):
-    with open('loc_data.json', 'r') as json_file:
+    with open(loc_file_path, 'r') as json_file:
         existing_geo_locs = json.load(json_file)
         lat_list = []
         long_list = []
@@ -156,7 +159,7 @@ def setup_location_fields(df):
                         'long': arrived_from_location_data.get('long')
                     }
 
-        with open('loc_data.json', mode='w') as out_file:
+        with open(loc_file_path, mode='w') as out_file:
             json.dump(existing_geo_locs, out_file)
 
         return df.assign(DHB_Latitude=lat_list, DHB_Longitude=long_list,
