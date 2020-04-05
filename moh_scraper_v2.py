@@ -3,70 +3,32 @@ import os
 from bs4 import BeautifulSoup
 import requests
 import pandas as pd
-import time
 import json
 from geopy.geocoders import Nominatim
 
 # Script used to import Ministry of Health Data into Power BI
 # Author: Harry Ellerm
 
-# File containing location info
-loc_file = 'loc_data.json'
-
-# Base data folder
-data_folder = os.path.join(os.path.join(os.environ['USERPROFILE']), 'Documents', 'MOH_Data')
-# Geo location folder
-geo_data_folder = os.path.join(data_folder, 'Geo_Data')
-# COP export folder
-cop_export_folder = os.path.join(data_folder, 'COP_Export')
-
-# Path to loc file
-loc_file_path = os.path.join(geo_data_folder, loc_file)
-
+# Path where MOH Data is stored
+base_folder = os.path.join(os.path.join(os.environ['USERPROFILE']), 'Documents', 'MOH_Data')
 # Base data url for download link
 base_data_url = 'https://www.health.govt.nz'
-# Json file for storing geo-cords
 # Current cases url where link exists
 current_cases_url = 'https://www.health.govt.nz/our-work/diseases-and-conditions/covid-19-novel-coronavirus/covid-19' \
                     '-current-situation/covid-19-current-cases/covid-19-current-cases-details'
-
+# Location data file
+loc_file_path = os.path.join(os.path.join(os.environ['USERPROFILE']), 'Documents', 'MOH_Data', 'Geo_Data',
+                             'loc_data.json')
 # Geo locator object used for finding lat & long co-ordinates
 geo_locator = Nominatim(user_agent='moh_scraper', timeout=10)
 
 
-# Creates a folder for a specified path if it doesn't exist
-def setup_folder(path):
-    try:
-        if os.path.exists(path):
-            print(f'>> Folder exists: {path}')
-        else:
-            print(f'>> Could not find folder for path {path}... creating')
-            os.makedirs(path)
-    except OSError:
-        print('>> Error creating folder structure... exiting')
-        exit(1)
-
-
-# Sets up the environment necessary for the script to run
-def setup_environ():
-    setup_folder(data_folder)
-    setup_folder(geo_data_folder)
-    setup_folder(cop_export_folder)
-
-    # Create JSON file to hold geo-loc data if needed
-    if not os.path.exists(loc_file_path):
-        empty = {}
-        print(f'>> Could not find geo-loc file, creating {loc_file_path}')
-        with open(loc_file_path, 'a') as out_file:
-            json.dump(empty, out_file)
-    else:
-        print(f'>> File exists: {loc_file_path}')
-
-
-# Finds the path to the file that contains data on the MOH web page
-# and downloads it for use later in the script
 def setup_data_source_path():
     end_url = ''
+    # Used to escape the leading 0 of a month
+    # i.e. to get 1 instead of 01 for the first day of the month
+    # Solution varies between platforms
+    # See: https://stackoverflow.com/questions/904928/python-strftime-date-without-leading-0
     test_request = requests.get(current_cases_url)
     # If web page is live search for link to download data
     if test_request.status_code == 200:
@@ -90,12 +52,11 @@ def setup_data_source_path():
 
 
 # Returns the geo-location associated with a location
-# location_name: Name of location i.e. "Wellington"
-# nz: Boolean, representing if the location is within NZ or not
+# Parameter: Name of location i.e. "Wellington"
 # Returns: A dictionary of geo location data associated with the location
 # i.e. {'location': 'Wellington', 'lat': -41.2887953, 'long': 174.7772114}
 def get_geo_loc(location_name, nz):
-    # Custom mapping rules - due to geo-locator not being able to pick up some DHBs and locations
+    # Custom mapping rules - due to geolocater not being able to pick up some DHB's and locations
     if location_name == 'Capital and Coast':
         location_name = 'Wellington'
     elif location_name == 'MidCentral':
@@ -125,14 +86,10 @@ def get_geo_loc(location_name, nz):
 def download_file(from_url, to_folder):
     file_name_from_url = os.path.basename(from_url)
     file_loc = to_folder + '\\' + file_name_from_url
-    if os.path.exists(file_loc):
-        print(f'>> Latest data has already been downloaded, exiting...')
-        exit(1)
-    else:
-        new_file = open(file_loc, 'wb')
-        response = get(from_url)
-        new_file.write(response.content)
-        return file_loc
+    new_file = open(file_loc, 'wb')
+    response = get(from_url)
+    new_file.write(response.content)
+    return file_loc
 
 
 # Sets up the location fields within the output data frame
@@ -153,7 +110,6 @@ def setup_location_fields(df):
                 lat_list.append(existing_geo_locs[row['DHB']]['lat'])
                 long_list.append(existing_geo_locs[row['DHB']]['long'])
             else:
-                print(f'Never queried location info for {row["DHB"]} before, querying...')
                 dhb_location_data = get_geo_loc(row['DHB'], nz=True)
                 lat_list.append(dhb_location_data.get('lat'))
                 long_list.append(dhb_location_data.get('long'))
@@ -163,7 +119,6 @@ def setup_location_fields(df):
                 }
 
             # Setup previous country travelled to data
-            # Need to data frames to be same length
             if row['Last country before return'] == '':
                 arrived_from_lat_list.append(None)
                 arrived_from_long_list.append(None)
@@ -173,7 +128,6 @@ def setup_location_fields(df):
                     arrived_from_lat_list.append(existing_geo_locs[row['Last country before return']]['lat'])
                     arrived_from_long_list.append(existing_geo_locs[row['Last country before return']]['long'])
                 else:
-                    print(f'Never queried location info for {row["Last country before return"]} before, querying...')
                     arrived_from_location_data = get_geo_loc(row['Last country before return'], nz=False)
                     arrived_from_lat_list.append(arrived_from_location_data.get('lat'))
                     arrived_from_long_list.append(arrived_from_location_data.get('long'))
@@ -183,7 +137,7 @@ def setup_location_fields(df):
                     }
 
         with open(loc_file_path, mode='w') as out_file:
-            json.dump(existing_geo_locs, out_file, indent=4)
+            json.dump(existing_geo_locs, out_file)
 
         return df.assign(DHB_Latitude=lat_list, DHB_Longitude=long_list,
                          Arrived_From_Latitude=arrived_from_lat_list,
@@ -192,14 +146,9 @@ def setup_location_fields(df):
 
 if __name__ == '__main__':
     print('>>> Script started')
-    export_for_cop = True
-    # For debugging
-    pd.options.display.width = 0
-    print('-------------------------------- SETUP --------------------------------')
-    setup_environ()
     data_source_path = setup_data_source_path()
-    path_to_downloaded_file = download_file(from_url=data_source_path, to_folder=data_folder)
-    print('-----------------------------------------------------------------------')
+    path_to_downloaded_file = download_file(from_url=data_source_path, to_folder=base_folder)
+    pd.options.display.width = 0
 
     print(">> Building out confirmed cases...")
     # Read in current cases
@@ -224,13 +173,12 @@ if __name__ == '__main__':
     del current_cases_raw_df
     del probable_cases_raw_df
 
-    if export_for_cop:
-        print('>> Exporting for COP')
-        with pd.ExcelWriter(
-                f'{cop_export_folder}\\Covid_19_Data_For_Cop_{time.strftime("%Y%m%d")}.xlsx') as writer:
-            current_cases_df.to_excel(excel_writer=writer, sheet_name='Confirmed Cases', index=False)
-            probable_cases_df.to_excel(excel_writer=writer, sheet_name='Probable Cases', index=False)
-
+    # Export for COP
+    print('>> Exporting for COP')
+    # with pd.ExcelWriter(
+    #         f'{data_store_path}\\COP_Data\\Covid_19_Data_For_Cop_{time.strftime("%Y%m%d")}.xlsx') as writer:
+    #     current_cases_df.to_excel(excel_writer=writer, sheet_name='Confirmed Cases', index=False)
+    #     probable_cases_df.to_excel(excel_writer=writer, sheet_name='Probable Cases', index=False)
     print('>>> Ended')
 
 
