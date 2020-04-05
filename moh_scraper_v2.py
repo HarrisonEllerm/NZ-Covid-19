@@ -1,7 +1,6 @@
 from requests import get
 import os
 from bs4 import BeautifulSoup
-import platform
 import requests
 import pandas as pd
 import time
