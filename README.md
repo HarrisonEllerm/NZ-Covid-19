@@ -23,7 +23,7 @@ oddity that can cause confusion. For example, Power-BI doesn't mind the use of t
 if you use the os module to test to see if a file exists Power-BI fails to import the data resulting in the somewhat
 confusing error message below:
 
-___
+```
 DataSource.Error: ADO.NET: A problem occurred while processing your Python script
 
 Here are the technical details:
@@ -41,9 +41,7 @@ Here are the technical details:
 Incorrect function.
     ErrorCode=-2147467259
     ExceptionType=Microsoft.PowerBI.Scripting.Python.Exceptions.PythonUnexpectedException
-___
-
-
+```
 Caused by:
 ```python
     if os.path.exists(file_loc):
