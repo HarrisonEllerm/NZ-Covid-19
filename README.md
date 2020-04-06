@@ -23,25 +23,26 @@ oddity that can cause confusion. For example, Power-BI doesn't mind the use of t
 if you use the os module to test to see if a file exists Power BI fails to import the data resulting in the somewhat
 confusing error message below:
 
-> DataSource.Error: ADO.NET: A problem occurred while processing your Python script.
-> Here are the technical details:
-> Running the Python script encountered the following error:
+___
+DataSource.Error: ADO.NET: A problem occurred while processing your Python script
 
-> Incorrect function.
+Here are the technical details:
+Running the Python script encountered the following error:
+Incorrect function.
 
+Details:
+    DataSourceKind=Python
+    DataSourcePath=Python
+    Message=A problem occurred while processing your Python script.
 
-> Details:
-    > DataSourceKind=Python
-    > DataSourcePath=Python
-    > Message=A problem occurred while processing your Python script.
-> Here are the technical details:
-> Running the Python script encountered the following error:
+Here are the technical details:
+    Running the Python script encountered the following error:
 
-> Incorrect function.
+Incorrect function.
+    ErrorCode=-2147467259
+    ExceptionType=Microsoft.PowerBI.Scripting.Python.Exceptions.PythonUnexpectedException
+___
 
-
-    > ErrorCode=-2147467259
-    > ExceptionType=Microsoft.PowerBI.Scripting.Python.Exceptions.PythonUnexpectedException
 
 Caused by:
 ```python
@@ -54,6 +55,6 @@ Caused by:
         new_file.write(response.content)
         return file_loc
 ```
-This somewhat limits the ability check to see if folders exist and create them if they don't (for holding resources
+This somewhat limits the ability to check to see if folders exist and create them if they don't (for holding resources
 used within the script). I got around this by creating the folders manually. The error message also doesn't provide
-and useful information, limiting the programmer to manual debugging.
+very useful information, limiting the programmer to manual debugging.
