@@ -20,7 +20,7 @@ https://www.health.govt.nz/our-work/diseases-and-conditions/covid-19-novel-coron
 
 It is relatively easy to implement a python script for pumping data into a dashboard. However, there is the occasional
 oddity that can cause confusion. For example, Power-BI doesn't mind the use of the os module for joining paths, however
-if you use the os module to test to see if a file exists Power BI fails to import the data resulting in the somewhat
+if you use the os module to test to see if a file exists Power-BI fails to import the data resulting in the somewhat
 confusing error message below:
 
 ___
