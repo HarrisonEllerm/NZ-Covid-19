@@ -11,24 +11,30 @@ from geopy.geocoders import Nominatim
 
 # Path where MOH Data is stored
 base_folder = os.path.join(os.path.join(os.environ['USERPROFILE']), 'Documents', 'MOH_Data')
+# Location data file
+loc_file_path = os.path.join(os.path.join(os.environ['USERPROFILE']), 'Documents', 'MOH_Data', 'Geo_Data',
+                             'loc_data.json')
+
 # Base data url for download link
 base_data_url = 'https://www.health.govt.nz'
 # Current cases url where link exists
 current_cases_url = 'https://www.health.govt.nz/our-work/diseases-and-conditions/covid-19-novel-coronavirus/covid-19' \
                     '-current-situation/covid-19-current-cases/covid-19-current-cases-details'
-# Location data file
-loc_file_path = os.path.join(os.path.join(os.environ['USERPROFILE']), 'Documents', 'MOH_Data', 'Geo_Data',
-                             'loc_data.json')
+
 # Geo locator object used for finding lat & long co-ordinates
 geo_locator = Nominatim(user_agent='moh_scraper', timeout=10)
 
 
 def setup_data_source_path():
+    """
+    Sets up the data source path (path to download link).
+    Scrapes web page to find all links then looks for text
+    matching link description 'Download confirmed and probable
+    case data' on the MOH web page.
+
+    :return: download URL for MOH COVID-19 data file
+    """
     end_url = ''
-    # Used to escape the leading 0 of a month
-    # i.e. to get 1 instead of 01 for the first day of the month
-    # Solution varies between platforms
-    # See: https://stackoverflow.com/questions/904928/python-strftime-date-without-leading-0
     test_request = requests.get(current_cases_url)
     # If web page is live search for link to download data
     if test_request.status_code == 200:
@@ -51,12 +57,20 @@ def setup_data_source_path():
         exit(1)
 
 
-# Returns the geo-location associated with a location
-# Parameter: Name of location i.e. "Wellington"
-# Returns: A dictionary of geo location data associated with the location
-# i.e. {'location': 'Wellington', 'lat': -41.2887953, 'long': 174.7772114}
 def get_geo_loc(location_name, nz):
-    # Custom mapping rules - due to geolocater not being able to pick up some DHB's and locations
+    """
+    Returns the geo-location data (lat, long) associated with a location
+    i.e. {'location': 'Wellington', 'lat': -41.2887953, 'long': 174.7772114}
+
+    If a geo-location data is unable to be found for a location the script exits. This is
+    by design, the name of the location will have to be added to the custom mapping rules
+    below (see script output to find the location name).
+
+    :param location_name: the name of the location i.e. 'Auckland'
+    :param nz: True if the location is in NZ (helps the geo-location of places within New Zealand) or False if not
+    :return: a dictionary containing the location name, latitude & longitude
+    """
+    # Custom mapping rules - due to geo-locator not being able to pick up some DHB's and locations
     if location_name == 'Capital and Coast':
         location_name = 'Wellington'
     elif location_name == 'MidCentral':
@@ -80,10 +94,16 @@ def get_geo_loc(location_name, nz):
     return {'location': location_name, 'lat': data.latitude, 'long': data.longitude}
 
 
-# Downloads a file using requests and writes it
-# to an output file within the data store folder
-# Returns full path to the downloaded file
 def download_file(from_url, to_folder):
+    """
+    Downloads a file and writes it to an output file within the base folder.
+
+    If the latest data has already been downloaded the script exits.
+
+    :param from_url: the url to download the file from
+    :param to_folder: the folder to write the output file to
+    :return: the path to the file created
+    """
     file_name_from_url = os.path.basename(from_url)
     file_loc = to_folder + '\\' + file_name_from_url
     new_file = open(file_loc, 'wb')
@@ -96,6 +116,23 @@ def download_file(from_url, to_folder):
 # Queries a json file that holds geo-location data for previously
 # queried locations in order to reduce load on Nominatim API
 def setup_location_fields(df):
+    """
+    Sets up the location fields within the output DataFrames.
+
+    Queries a persistent JSON file that holds geo-location data for
+    previously queried locations. This helps reduce the number of queries
+    to the Nominatim API and improves the speed of the script.
+
+    Four location fields are setup:
+
+    DHB_Latitude: The latitude of the DHB where this case was reported
+    DHB_Longitude: The longitude of the DHB where this case was reported
+    Arrived_From_Latitude: The latitude of the country where this case arrived from, if any
+    Arrived_From_Longitude: The longitude of the country where this case arrived from, if any
+
+    :param df: the DataFrame to which the four location fields above are being added
+    :return: the modified DataFrame
+    """
     with open(loc_file_path, 'r') as json_file:
         existing_geo_locs = json.load(json_file)
         lat_list = []
@@ -119,7 +156,9 @@ def setup_location_fields(df):
                 }
 
             # Setup previous country travelled to data
-            if row['Last country before return'] == '':
+            # Doesn't make sense to have international travel as 'yes' if last country travelled to is recorded
+            # as New Zealand
+            if row['Last country before return'] == '' or row['Last country before return'] == 'New Zealand':
                 arrived_from_lat_list.append(None)
                 arrived_from_long_list.append(None)
             else:
@@ -141,7 +180,7 @@ def setup_location_fields(df):
 
         return df.assign(DHB_Latitude=lat_list, DHB_Longitude=long_list,
                          Arrived_From_Latitude=arrived_from_lat_list,
-                         Arrived_from_Longitude=arrived_from_long_list)
+                         Arrived_From_Longitude=arrived_from_long_list)
 
 
 if __name__ == '__main__':
@@ -176,7 +215,7 @@ if __name__ == '__main__':
     # Export for COP
     print('>> Exporting for COP')
     # with pd.ExcelWriter(
-    #         f'{data_store_path}\\COP_Data\\Covid_19_Data_For_Cop_{time.strftime("%Y%m%d")}.xlsx') as writer:
+    #         f'{base_folder}\\COP_Data\\Covid_19_Data_For_Cop_{time.strftime("%Y%m%d")}.xlsx') as writer:
     #     current_cases_df.to_excel(excel_writer=writer, sheet_name='Confirmed Cases', index=False)
     #     probable_cases_df.to_excel(excel_writer=writer, sheet_name='Probable Cases', index=False)
     print('>>> Ended')
