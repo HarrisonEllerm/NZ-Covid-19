@@ -1,0 +1,14 @@
+-- Confirmed cases table --
+Confirmed Cases = COUNT(current_cases_df[Date of report])
+Total Cases = [Confirmed Cases] + probable_cases_df[Probable Cases]
+
+-- Probable cases table --
+Probable Cases = COUNT(probable_cases_df[Date of report])
+
+-- Summary stats table --
+Cases in Hospital = SUM(summary_stats_df[Number of cases in hospital])
+Death = SUM(summary_stats_df[Number of deaths])
+Recovered = SUM(summary_stats_df[Number of recovered cases])
+
+-- All Cases Table --
+Last Updated = LEFT(MAX(all_cases[Date of report]), 9)

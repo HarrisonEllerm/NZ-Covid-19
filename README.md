@@ -56,3 +56,7 @@ Caused by:
 This somewhat limits the ability to check to see if folders exist and create them if they don't (for holding resources
 used within the script). I got around this by creating the folders manually. The error message also doesn't provide
 very useful information, limiting the programmer to manual debugging.
+
+
+
+

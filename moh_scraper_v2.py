@@ -17,6 +17,9 @@ loc_file_path = os.path.join(os.path.join(os.environ['USERPROFILE']), 'Documents
 
 # Base data url for download link
 base_data_url = 'https://www.health.govt.nz'
+# URL used to grab key summary stats
+summary_stats_url = 'https://www.health.govt.nz/our-work/diseases-and-conditions/covid-19-novel-coronavirus/' \
+                    'covid-19-current-situation/covid-19-current-cases'
 # Current cases url where link exists
 current_cases_url = 'https://www.health.govt.nz/our-work/diseases-and-conditions/covid-19-novel-coronavirus/covid-19' \
                     '-current-situation/covid-19-current-cases/covid-19-current-cases-details'
@@ -52,7 +55,25 @@ def setup_data_source_path():
             exit(1)
 
     else:
-        print(f'>> Could not find current cases web-page, check that the link {current_cases_url} is still valid... '
+        print(f'>> Could not find web-page, check that the link {current_cases_url} is still valid... '
+              f'exiting')
+        exit(1)
+
+
+def get_key_stats():
+    test_request = requests.get(summary_stats_url)
+    # If web page is live search for link to download data
+    if test_request.status_code == 200:
+        response = requests.get(summary_stats_url)
+        soup = BeautifulSoup(response.text, 'html.parser')
+        tables = soup.findAll('table')
+        # Build out summary stats table - the first table in this web page
+        raw_summary_stats_df = pd.read_html(str(tables[0]))[0]
+        raw_summary_stats_df.columns = ['Statistic', 'Total to date', 'New in last 24 hours']
+        # Transpose
+        return raw_summary_stats_df.set_index('Statistic').T
+    else:
+        print(f'>> Could not find web-page, check that the link {summary_stats_url} is still valid... '
               f'exiting')
         exit(1)
 
@@ -75,8 +96,14 @@ def get_geo_loc(location_name, nz):
         location_name = 'Wellington'
     elif location_name == 'MidCentral':
         location_name = 'Palmerston North'
-    elif location_name == 'Polynesia (excludes Hawaii) nfd':
+    elif location_name == 'Polynesia (excludes Hawaii)':
         location_name = 'Polynesia'
+    elif location_name == 'Polynesia (excludes Hawaii) ':
+        location_name = 'Polynesia'
+    # As South Canterbury is an informal name given to an area within
+    # Canterbury - set it to a town in the middle the informal area
+    elif location_name == 'South Canterbury':
+        location_name = 'Fairlie'
     # If undefined just assign New Zealand as geo-location
     elif location_name == 'TBC':
         location_name = 'New Zealand'
@@ -208,16 +235,20 @@ if __name__ == '__main__':
     probable_cases_df = probable_cases_df.fillna('')
     probable_cases_df = setup_location_fields(probable_cases_df)
 
+    print(">> Building out summary stats...")
+    # Grab summary stats
+    summary_stats_df = get_key_stats().loc[['Total to date'], ['Number of cases in hospital',
+                                                               'Number of recovered cases', 'Number of deaths']]
+
     # Get rid of raw data frames to avoid accidental import into Power-BI
     del current_cases_raw_df
     del probable_cases_raw_df
 
     # Export for COP
     print('>> Exporting for COP')
-    # with pd.ExcelWriter(
-    #         f'{base_folder}\\COP_Data\\Covid_19_Data_For_Cop_{time.strftime("%Y%m%d")}.xlsx') as writer:
-    #     current_cases_df.to_excel(excel_writer=writer, sheet_name='Confirmed Cases', index=False)
-    #     probable_cases_df.to_excel(excel_writer=writer, sheet_name='Probable Cases', index=False)
+    with pd.ExcelWriter(
+            f'{base_folder}\\COP_Export\\Covid_19_Data_For_Cop.xlsx') as writer:
+        current_cases_df.to_excel(excel_writer=writer, sheet_name='Confirmed Cases', index=False)
+        probable_cases_df.to_excel(excel_writer=writer, sheet_name='Probable Cases', index=False)
+        summary_stats_df.to_excel(excel_writer=writer, sheet_name='Summary Stats', index=False)
     print('>>> Ended')
-
-
