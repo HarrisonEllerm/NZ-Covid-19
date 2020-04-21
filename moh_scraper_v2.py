@@ -226,6 +226,8 @@ if __name__ == '__main__':
     current_cases_df = current_cases_df.fillna('')
     # Setup location data
     current_cases_df = setup_location_fields(current_cases_df)
+    # Setup confirmed/probable identifier
+    current_cases_df['Confirmed_or_Probable'] = 1
 
     print(">> Building out probable cases...")
     # Read in probable cases
@@ -234,21 +236,44 @@ if __name__ == '__main__':
     probable_cases_df = probable_cases_df.dropna(axis=1, how='all')
     probable_cases_df = probable_cases_df.fillna('')
     probable_cases_df = setup_location_fields(probable_cases_df)
+    # Setup confirmed/probable identifier
+    probable_cases_df['Confirmed_or_Probable'] = 0
+
+    # Merge into all cases
+    cases_df = current_cases_df.append(probable_cases_df, ignore_index=True)
 
     print(">> Building out summary stats...")
-    # Grab summary stats
-    summary_stats_df = get_key_stats().loc[['Total to date'], ['Number of cases in hospital',
-                                                               'Number of recovered cases', 'Number of deaths']]
+    # Grab summary stats should probably extract this logic out elsewhere
+    summary_stats_raw_df = get_key_stats()
+
+    # Figure out a better way to do this - table headers keep changing
+    # Maybe use integer indexing instead
+
+    summary_stats_df = summary_stats_raw_df.loc[['Total to date'], ['Number of cases currently in hospital',
+                                                                    'Number of recovered cases', 'Number of deaths']]
+
+    new_in_last_24_hours = summary_stats_raw_df.loc[
+        ['New in last 24 hours'], ['Number of confirmed cases in New Zealand',
+                                   'Number of probable cases']]
+
+    summary_stats_df['Increase in confirmed cases within 24 hours'] = new_in_last_24_hours.at['New in last 24 hours',
+                                                                                              'Number of confirmed ' 
+                                                                                              'cases in New Zealand']
+    summary_stats_df['Increase in probable cases within 24 hours'] = new_in_last_24_hours.at['New in last 24 hours',
+                                                                                             'Number of probable cases']
 
     # Get rid of raw data frames to avoid accidental import into Power-BI
+    del current_cases_df
+    del probable_cases_df
     del current_cases_raw_df
     del probable_cases_raw_df
+    del summary_stats_raw_df
+    del new_in_last_24_hours
 
     # Export for COP
     print('>> Exporting for COP')
     with pd.ExcelWriter(
             f'{base_folder}\\COP_Export\\Covid_19_Data_For_Cop.xlsx') as writer:
-        current_cases_df.to_excel(excel_writer=writer, sheet_name='Confirmed Cases', index=False)
-        probable_cases_df.to_excel(excel_writer=writer, sheet_name='Probable Cases', index=False)
+        cases_df.to_excel(excel_writer=writer, sheet_name='Confirmed and Probable Cases', index=False)
         summary_stats_df.to_excel(excel_writer=writer, sheet_name='Summary Stats', index=False)
     print('>>> Ended')

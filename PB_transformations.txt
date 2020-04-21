@@ -1,0 +1,14 @@
+Transformations applied to raw data in Power-BI:
+
+# Cases Table
+Last Updated = LEFT(MAX(cases_df[Date of report]), 9)
+Total Cases = COUNT(cases_df[Date of report])
+Confirmed Cases = CALCULATE(COUNT(cases_df[Date of report]), FILTER(cases_df, cases_df[Confirmed_or_Probable] = 1))
+Probable Cases = CALCULATE(COUNT(cases_df[Date of report]), FILTER(cases_df, cases_df[Confirmed_or_Probable] = 0))
+
+# Summary Stats Table
+Cases in Hospital = SUM(summary_stats_df[Number of cases currently in hospital])
+Deaths = SUM(summary_stats_df[Number of deaths])
+Recovered = SUM(summary_stats_df[Number of recovered cases])
+Increase in confirmed cases within the last 24 hours = SUM(summary_stats_df[Increase in confirmed cases within 24 hours])
+Increase in probable cases within the last 24 hours = SUM(summary_stats_df[Increase in probable cases within 24 hours])
