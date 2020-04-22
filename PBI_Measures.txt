@@ -1,4 +1,4 @@
-Transformations applied to raw data in Power-BI:
+Measures used within in Power-BI:
 
 # Cases Table
 Last Updated = LEFT(MAX(cases_df[Date of report]), 9)

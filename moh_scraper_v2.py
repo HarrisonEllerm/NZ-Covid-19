@@ -160,6 +160,7 @@ def setup_location_fields(df):
     :param df: the DataFrame to which the four location fields above are being added
     :return: the modified DataFrame
     """
+
     with open(loc_file_path, 'r') as json_file:
         existing_geo_locs = json.load(json_file)
         lat_list = []
@@ -257,7 +258,7 @@ if __name__ == '__main__':
                                    'Number of probable cases']]
 
     summary_stats_df['Increase in confirmed cases within 24 hours'] = new_in_last_24_hours.at['New in last 24 hours',
-                                                                                              'Number of confirmed ' 
+                                                                                              'Number of confirmed '
                                                                                               'cases in New Zealand']
     summary_stats_df['Increase in probable cases within 24 hours'] = new_in_last_24_hours.at['New in last 24 hours',
                                                                                              'Number of probable cases']
@@ -277,3 +278,4 @@ if __name__ == '__main__':
         cases_df.to_excel(excel_writer=writer, sheet_name='Confirmed and Probable Cases', index=False)
         summary_stats_df.to_excel(excel_writer=writer, sheet_name='Summary Stats', index=False)
     print('>>> Ended')
+
