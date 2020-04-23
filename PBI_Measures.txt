@@ -1,7 +1,7 @@
 Measures used within in Power-BI:
 
 # Cases Table
-Last Updated = LEFT(MAX(cases_df[Date of report]), 9)
+Last Updated = LEFT(MAX(cases_df[Date of report]), 10)
 Total Cases = COUNT(cases_df[Date of report])
 Confirmed Cases = CALCULATE(COUNT(cases_df[Date of report]), FILTER(cases_df, cases_df[Confirmed_or_Probable] = 1))
 Probable Cases = CALCULATE(COUNT(cases_df[Date of report]), FILTER(cases_df, cases_df[Confirmed_or_Probable] = 0))
