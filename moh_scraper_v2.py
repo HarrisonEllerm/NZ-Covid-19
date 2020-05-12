@@ -175,9 +175,6 @@ def download_file(from_url, to_folder):
     return file_loc
 
 
-# Sets up the location fields within the output data-frame
-# Queries a json file that holds geo-location data for previously
-# queried locations in order to reduce load on Nominatim API
 def setup_location_fields(df):
     """
     Sets up the location fields within the output DataFrames.

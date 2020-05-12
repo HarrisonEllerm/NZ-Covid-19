@@ -7,10 +7,12 @@ way to hack up a quick dashboard.
 This mini-project was used as a way to experiment with importing data into Power-BI via a python script. It is not
 intended to be used as an official source of information related to COVID-19.
 
+I wrote a short LinkedIn article on this topic that you can find here: https://www.linkedin.com/pulse/visualising-new-zealand-covid-19-data-harrison-ellerm/
+
 
 ### Initial Dashboard Mock Up
 
-![Dashboard Example](https://github.com/HarrisonEllerm/NZ-Covid-19/blob/master/Dashboard_Ex_2.PNG?raw=True)
+![Dashboard Example](https://github.com/HarrisonEllerm/NZ-Covid-19/blob/master/Dashboard_Ex_3.PNG?raw=True)
 
 Ministry of Health Link:
 
