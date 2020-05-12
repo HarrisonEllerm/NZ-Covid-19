@@ -60,7 +60,7 @@ def setup_data_source_path():
 
     else:
         print(f'>> Could not find web-page, check that the link {current_cases_url} is still valid... '
-              f'exiting')
+              f'>> exiting...')
         exit(1)
 
 
