@@ -12,7 +12,7 @@ I wrote a short LinkedIn article on this topic that you can find here: https://w
 
 ### Initial Dashboard Mock Up
 
-![Dashboard Example](https://github.com/HarrisonEllerm/NZ-Covid-19/blob/master/Dashboard_Ex_4.PNG?raw=True)
+![Dashboard Example](https://github.com/HarrisonEllerm/NZ-Covid-19/blob/master/Dashboard_Ex_4.png?raw=True)
 
 Ministry of Health Link:
 
