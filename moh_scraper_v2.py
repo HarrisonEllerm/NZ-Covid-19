@@ -78,7 +78,6 @@ def get_key_stats():
        - Number of deaths
        - Increase in confirmed cases within 24 hours
        - Increase in probable cases within 24 hours
-
     """
     test_request = requests.get(summary_stats_url)
     # If web page is live search for link to download data
@@ -113,7 +112,7 @@ def get_key_stats():
         exit(1)
 
 
-def get_geo_loc(location_name, nz):
+def get_geo_loc(location_name, nz=False):
     """
     Returns the geo-location data (lat, long) associated with a location
     i.e. {'location': 'Wellington', 'lat': -41.2887953, 'long': 174.7772114}
@@ -156,6 +155,8 @@ def get_geo_loc(location_name, nz):
         print(f'>> exiting...')
         exit(1)
 
+    print(f'>> Found new location {location_name}...')
+
     return {'location': location_name, 'lat': data.latitude, 'long': data.longitude}
 
 
@@ -175,10 +176,7 @@ def download_file(from_url, to_folder):
     return file_loc
 
 
-# Sets up the location fields within the output data-frame
-# Queries a json file that holds geo-location data for previously
-# queried locations in order to reduce load on Nominatim API
-def setup_location_fields(df):
+def setup_locs(df):
     """
     Sets up the location fields within the output DataFrames.
 
@@ -195,10 +193,13 @@ def setup_location_fields(df):
 
     :param df: the data-frame to which the four location fields above are being added
     :return: the modified data-frame
+
+    TODO: This looping isn't great, maybe refactor (vectorise)? Although relatively small number of rows...
     """
 
-    with open(loc_file_path, 'r') as json_file:
+    with open(loc_file_path, 'r+') as json_file:
         existing_geo_locs = json.load(json_file)
+        orig_num_existing_locs = len(existing_geo_locs)
         lat_list = []
         long_list = []
         arrived_from_lat_list = []
@@ -222,7 +223,7 @@ def setup_location_fields(df):
             # Setup previous country travelled to data
             # Doesn't make sense to have international travel as 'yes' if last country travelled to is recorded
             # as New Zealand
-            if row['Last country before return'] == '' or row['Last country before return'] == 'New Zealand':
+            if pd.isna(row['Last country before return']) or row['Last country before return'] == 'New Zealand':
                 arrived_from_lat_list.append(None)
                 arrived_from_long_list.append(None)
             else:
@@ -239,8 +240,11 @@ def setup_location_fields(df):
                         'long': arrived_from_location_data.get('long')
                     }
 
-        with open(loc_file_path, mode='w') as out_file:
-            json.dump(existing_geo_locs, out_file)
+        # Overwrite json file with new content if there is any
+        if len(existing_geo_locs) > orig_num_existing_locs:
+            json_file.seek(0)
+            json_file.truncate()
+            json.dump(existing_geo_locs, json_file)
 
         return df.assign(DHB_Latitude=lat_list, DHB_Longitude=long_list,
                          Arrived_From_Latitude=arrived_from_lat_list,
@@ -257,15 +261,9 @@ def setup_case_data(path_to_wb, sheet_name, confirmed_or_probable_identifier):
     :return: the case data data-frame
     """
     # Read in case data
-    df = pd.read_excel(path_to_wb, sheet_name=sheet_name, engine='openpyxl')
-    # Set columns and get rid of spaces above tabular data
-    df = pd.DataFrame(df.values[3:], columns=df.iloc[2])
-    # Clean up some rubbish columns
-    df = df.dropna(axis=1, how='all')
-    # Makes it easier to test if they travelled to a country prior to contracting
-    df = df.fillna('')
+    df = pd.read_excel(path_to_wb, sheet_name=sheet_name, engine='openpyxl', skiprows=3)
     # Setup location data
-    df = setup_location_fields(df)
+    df = setup_locs(df)
     # Setup confirmed/probable identifier
     df['Confirmed_or_Probable'] = confirmed_or_probable_identifier
     return df
@@ -310,4 +308,3 @@ if __name__ == '__main__':
         cases_df.to_excel(excel_writer=writer, sheet_name='Confirmed and Probable Cases', index=False)
         summary_df.to_excel(excel_writer=writer, sheet_name='Summary Stats', index=False)
     print('>>> Ended')
-
